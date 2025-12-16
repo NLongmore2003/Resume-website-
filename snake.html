@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Snake Football</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --field-green: #1b5e20;
+      --endzone-orange: #ff9800;
+      --accent-blue: #64b5f6;
+      --card-bg: #ffffff;
+      --text-main: #263238;
+      --shadow: 0 18px 40px rgba(0,0,0,0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Quicksand", system-ui, sans-serif;
+      background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+      min-height: 100vh;
+      padding: 32px 16px;
+      color: var(--text-main);
+    }
+
+    .back-btn {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: white;
+      border: 2px solid var(--accent-blue);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      font-size: 0.9rem;
+      text-decoration: none;
+      color: var(--text-main);
+      z-index: 9999;
+    }
+
+    .shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 36px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+      display: grid;
+      grid-template-columns: 2.2fr 1.2fr;
+      gap: 24px;
+    }
+
+    .left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
+    }
+
+    .logo {
+      width: 72px;
+      height: 72px;
+      border-radius: 22px;
+      background: linear-gradient(135deg, #ffcc80, #ff9800);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    }
+
+    .game-card {
+      background: var(--card-bg);
+      border-radius: 30px;
+      padding: 18px;
+      border: 4px solid var(--accent-blue);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+    }
+
+    canvas {
+      background: var(--field-green);
+      border-radius: 22px;
+      border: 6px solid white;
+    }
+
+    .status {
+      font-size: 0.95rem;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: #e3f2fd;
+      border: 1px solid #90caf9;
+    }
+
+    .right {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* HOW TO PLAY BOX */
+    .info-card {
+      background: white;
+      border-radius: 26px;
+      padding: 20px;
+      border: 3px solid var(--accent-blue);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+      text-align: center;
+    }
+
+    .info-card ol {
+      list-style-position: inside;
+      padding-left: 0;
+    }
+
+    .info-card li {
+      margin: 8px 0;
+    }
+
+    @media (max-width: 900px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<a href="scratchpage.html" class="back-btn">Back to Scratch Page</a>
+
+<div class="shell">
+
+  <!-- LEFT -->
+  <div class="left">
+    <header>
+      <div class="logo">🏈</div>
+      <div>
+        <h1>Snake Football</h1>
+        <p>Dodge defenders. Reach the end zone. Score touchdowns.</p>
+      </div>
+    </header>
+
+    <div class="game-card">
+      <div class="status" id="statusText">Press SPACE to start</div>
+      <canvas id="game" width="520" height="520"></canvas>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right">
+    <div class="info-card">
+      <h2>📋 How to Play</h2>
+      <ol>
+        <li>Press <strong>SPACE</strong> to start the game</li>
+        <li>Move using <strong>Arrow Keys</strong> or <strong>WASD</strong></li>
+        <li>Avoid the red defenders</li>
+        <li>Reach the orange end zone to score</li>
+        <li>If tackled, press <strong>SPACE</strong> to restart</li>
+      </ol>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const statusText = document.getElementById("statusText");
+
+  const tileCount = 20;
+  const tileSize = canvas.width / tileCount;
+
+  let snake, velocity, defenders, score;
+  let running = false;
+
+  function setupGame() {
+    snake = [
+      { x: 2, y: 10 },
+      { x: 1, y: 10 },
+      { x: 0, y: 10 }
+    ];
+    velocity = { x: 1, y: 0 };
+
+    defenders = [];
+    for (let i = 0; i < 6; i++) {
+      defenders.push({
+        x: 6 + Math.floor(Math.random() * 8),
+        y: Math.floor(Math.random() * tileCount),
+        dir: Math.random() < 0.5 ? 1 : -1
+      });
+    }
+
+    score = 0;
+    running = false;
+    statusText.textContent = "Press SPACE to start";
+    draw();
+  }
+
+  function update() {
+    if (!running) return;
+
+    const head = {
+      x: snake[0].x + velocity.x,
+      y: snake[0].y + velocity.y
+    };
+
+    if (head.x < 0 || head.y < 0 || head.x >= tileCount || head.y >= tileCount) {
+      endGame();
+      return;
+    }
+
+    for (const d of defenders) {
+      if (d.x === head.x && d.y === head.y) {
+        endGame();
+        return;
+      }
+    }
+
+    snake.unshift(head);
+    snake.pop();
+
+    defenders.forEach(d => {
+      d.y += d.dir;
+      if (d.y < 0 || d.y >= tileCount) d.dir *= -1;
+    });
+
+    if (head.x === tileCount - 1) {
+      score++;
+      snake = [
+        { x: 2, y: 10 },
+        { x: 1, y: 10 },
+        { x: 0, y: 10 }
+      ];
+      velocity = { x: 1, y: 0 };
+    }
+
+    draw();
+  }
+
+  function endGame() {
+    running = false;
+    statusText.textContent = "Tackled! Press SPACE to restart";
+  }
+
+  function draw() {
+    ctx.fillStyle = "#1b5e20";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    /* Yard lines */
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    for (let x = 0; x <= tileCount; x += 2) {
+      ctx.beginPath();
+      ctx.moveTo(x * tileSize, 0);
+      ctx.lineTo(x * tileSize, canvas.height);
+      ctx.stroke();
+    }
+
+    /* End zone */
+    ctx.fillStyle = "#ff9800";
+    ctx.fillRect((tileCount - 1) * tileSize, 0, tileSize, canvas.height);
+
+    snake.forEach((s, i) => {
+      ctx.fillStyle = i === 0 ? "#66bb6a" : "#81c784";
+      ctx.fillRect(s.x * tileSize + 2, s.y * tileSize + 2, tileSize - 4, tileSize - 4);
+    });
+
+    defenders.forEach(d => {
+      ctx.fillStyle = "#e53935";
+      ctx.fillRect(d.x * tileSize + 2, d.y * tileSize + 2, tileSize - 4, tileSize - 4);
+    });
+
+    ctx.fillStyle = "white";
+    ctx.font = "16px Quicksand";
+    ctx.fillText("Score: " + score, 12, 22);
+  }
+
+  window.addEventListener("keydown", e => {
+    if (e.code === "Space") {
+      if (!running) {
+        setupGame();
+        running = true;
+        statusText.textContent = "Game in progress...";
+      }
+      return;
+    }
+
+    if (!running) return;
+
+    if (e.key === "ArrowUp" || e.key === "w") velocity.y !== 1 && (velocity = { x: 0, y: -1 });
+    if (e.key === "ArrowDown" || e.key === "s") velocity.y !== -1 && (velocity = { x: 0, y: 1 });
+    if (e.key === "ArrowLeft" || e.key === "a") velocity.x !== 1 && (velocity = { x: -1, y: 0 });
+    if (e.key === "ArrowRight" || e.key === "d") velocity.x !== -1 && (velocity = { x: 1, y: 0 });
+  });
+
+  setupGame();
+  setInterval(update, 120);
+</script>
+
+</body>
+</html>
